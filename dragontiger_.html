@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>龙虎大屏</title>
+<style>
+    :root {
+        --bg-dark: #2b1a15; --bg-panel: #3d231d; --gold: #d4af37;
+        --text-gold: #ffeb3b; --red: #d32f2f; --blue: #1976d2;
+        --green: #388e3c; --cell-bg: #f5efe6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    body { display: flex; justify-content: center; align-items: center;
+        font-family: 'Microsoft YaHei', Arial, sans-serif; }
+
+    .screen { width: 1920px; height: 1080px; background: var(--bg-dark);
+        border: 6px solid var(--gold); position: relative;
+        transform-origin: center center; transform: scale(1); overflow: hidden; }
+
+    /* ===== 顶栏 ===== */
+    .top-banner { position: absolute; top: 0; left: 0; right: 0; height: 52px;
+        background: var(--bg-panel); border-bottom: 3px solid var(--gold);
+        display: flex; align-items: center; justify-content: space-between; padding: 0 12px; z-index: 100; }
+    .top-left { display: flex; align-items: center; gap: 20px; }
+    .min-max { display: flex; gap: 5px; }
+    .min-box, .max-box { padding: 2px 12px; font-weight: bold; font-size: 18px; color: #fff; border-radius: 2px; }
+    .min-box { background: var(--blue); } .max-box { background: var(--red); }
+    .min-box span, .max-box span { color: var(--text-gold); margin-left: 6px; }
+    .info-item { font-size: 14px; color: #bbb; }
+    .info-item b { color: var(--text-gold); font-size: 16px; margin-left: 5px; }
+    .top-right { display: flex; gap: 18px; align-items: center; }
+    .score-tag { display: flex; align-items: center; gap: 6px; }
+    .score-tag .label { padding: 3px 12px; color: #fff; font-weight: bold; font-size: 16px; border-radius: 2px; }
+    .score-tag .label.banker { background: var(--red); } .score-tag .label.player { background: var(--blue); }
+    .score-tag .num { color: var(--text-gold); font-size: 32px; font-weight: bold; width: 50px; text-align: right; }
+    .top-btn { padding: 5px 14px; background: var(--gold); color: #000;
+        border: none; border-radius: 3px; font-weight: bold; font-size: 14px; cursor: pointer; }
+    .top-btn:hover { background: #e6c34a; }
+
+    /* ===== 牌路区 ===== */
+    .road-area { position: absolute; top: 55px; left: 0; width: 100%; height: 995px; }
+    .road-canvas { position: absolute; left: 0; background: var(--cell-bg);
+        border: 2px solid var(--gold); overflow: hidden; }
+    .road-canvas .grid-title { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        font-size: 26px; color: rgba(0,0,0,0.05); font-weight: bold; letter-spacing: 8px; pointer-events: none; z-index: 0; }
+    #beadPlateCanvas { top: 0; width: 1248px; height: 520px; }
+    #bigRoadCanvas   { top: 523px; width: 1920px; height: 260px; }
+    #topBottomRoadCanvas { top: 786px; width: 1920px; height: 90px; display: flex; flex-direction: row; }
+    #bottomRoadCanvas { top: 879px; width: 1920px; height: 90px; display: flex; flex-direction: row; }
+    .bottom-road-half { position: relative; width: 50%; height: 100%; border-right: 1px solid var(--gold); }
+    .bottom-road-half:last-child { border-right: none; }
+    .bottom-road-half .grid-title { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        font-size: 22px; color: rgba(0,0,0,0.05); font-weight: bold; letter-spacing: 6px; pointer-events: none; z-index: 0; }
+
+    /* ===== 右侧面板：左中右三列 ===== */
+    .right-panel { position: absolute; top: 55px; right: 0; width: 768px; height: 520px;
+        background: var(--bg-panel); border-left: 3px solid var(--gold);
+        padding: 10px 12px;
+        display: grid;
+        grid-template-columns: 1.15fr 1fr 1.15fr;
+        gap: 10px;
+        overflow: hidden; z-index: 50; }
+
+    .panel-col { display: flex; flex-direction: column;
+        background: rgba(0,0,0,0.18);
+        border: 1px solid var(--gold);
+        border-radius: 5px;
+        padding: 10px 12px;
+        overflow: hidden; }
+
+    .panel-col.col-stats,
+    .panel-col.col-limits {
+        justify-content: space-around;
+        padding: 14px 14px;
+    }
+
+    .panel-col.middle { gap: 0; padding: 0; justify-content: flex-start; }
+
+    /* ===== 统计行 ===== */
+    .stat-row { display: flex; justify-content: space-between; align-items: center;
+        font-size: 22px; font-weight: bold; }
+    .stat-row .label { display: flex; align-items: center; gap: 8px; color: #e8d8c8; }
+    .stat-row .icon { width: 34px; height: 34px; border-radius: 50%;
+        display: inline-flex; justify-content: center; align-items: center;
+        font-size: 15px; font-weight: bold; color: #fff; flex-shrink: 0; }
+    .stat-row .val { color: var(--text-gold); font-weight: bold; font-size: 30px; }
+
+    /* ===== 限红行 ===== */
+    .limit-row { display: flex; justify-content: space-between; align-items: center;
+        font-size: 22px; font-weight: bold; gap: 8px; }
+    .limit-row .label { color: #e8d8c8; flex-shrink: 0; line-height: 1.2; }
+    .limit-row .val { color: var(--text-gold); font-weight: bold; font-size: 22px;
+        text-align: right; white-space: nowrap; }
+
+    /* ===== 中列：货币 ===== */
+    .currency-box {
+        text-align: center; padding: 16px 8px 12px;
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        border-bottom: 1px solid #6b453a;
+    }
+    .currency-box .title {
+        font-size: 16px; color: var(--text-gold); font-weight: bold;
+        letter-spacing: 1px; line-height: 1.25; text-align: center;
+    }
+    .currency-box .value {
+        font-size: 36px; color: var(--text-gold); font-weight: bold; line-height: 1;
+    }
+
+    /* ===== 中列：LOGO / 禁烟 ===== */
+    .no-smoking {
+        text-align: center; padding: 14px 8px;
+        border-bottom: 1px solid #6b453a;
+    }
+    .no-smoking .icon { font-size: 50px; line-height: 1; }
+    .no-smoking .text {
+        color: var(--red); font-size: 13px; font-weight: bold;
+        margin-top: 6px; line-height: 1.25;
+    }
+
+    /* ===== 中列：问路 ===== */
+    .askroad-mini {
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 12px 8px 14px;
+        margin-top: 0;
+        flex: 1;
+    }
+    .askroad-mini .title {
+        font-size: 13px; color: var(--text-gold); font-weight: bold;
+        text-align: center; margin-bottom: 4px; line-height: 1.3;
+    }
+    .askrow { display: grid; grid-template-columns: 44px 1fr 1fr 1fr; gap: 6px; align-items: center; }
+    .asklabel {
+        height: 44px; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        font-size: 15px; font-weight: bold; color: #fff;
+        border-radius: 4px; line-height: 1.1;
+    }
+    .asklabel.banker { background: var(--red); }
+    .asklabel.player { background: var(--blue); }
+    .asklabel .en { font-size: 12px; }
+
+    /* ===== 底部 ===== */
+    .footer-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 30px;
+        background: var(--bg-panel); border-top: 3px solid var(--gold);
+        display: flex; align-items: center; overflow: hidden; padding: 0 10px; z-index: 100; }
+    .footer-marquee { white-space: nowrap; color: var(--text-gold); font-size: 16px; font-weight: bold;
+        animation: marquee 18s linear infinite; }
+    @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+    .flash { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(255,235,59,0.95); color: #000; padding: 20px 40px; border-radius: 10px;
+        font-size: 28px; font-weight: bold; z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+    .flash.show { opacity: 1; }
+
+    /* 状态栏：默认隐藏，需要时设置里开 */
+    .status-bar { position: absolute; bottom: 35px; left: 10px; color: #ffeb3b; font-size: 14px;
+        background: rgba(0,0,0,0.85); padding: 6px 14px; border-radius: 4px; border: 1px solid #d4af37;
+        display: none; }
+
+    /* ===== 设置面板 ===== */
+    .settings-mask { position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7); z-index: 1000; display: none; }
+    .settings-mask.show { display: block; }
+    .settings-panel { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 900px; max-height: 820px; background: var(--bg-panel);
+        border: 3px solid var(--gold); border-radius: 8px; padding: 20px 26px;
+        display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+    .settings-panel h2 { color: var(--text-gold); font-size: 24px; text-align: center;
+        border-bottom: 2px solid var(--gold); padding-bottom: 10px; }
+    .settings-panel h3 { color: var(--text-gold); font-size: 16px; margin-top: 6px;
+        border-left: 4px solid var(--gold); padding-left: 8px; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .settings-row label { color: #ddd; font-size: 14px; flex: 0 0 110px; }
+    .settings-row input, .settings-row select { flex: 1; padding: 6px 10px; font-size: 14px;
+        background: #f5efe6; border: 1px solid var(--gold); border-radius: 3px; color: #000; }
+    .settings-row input[type="color"] { padding: 0; height: 32px; cursor: pointer; }
+    .settings-row input:focus, .settings-row select:focus { outline: 2px solid var(--text-gold); }
+    .settings-actions { display: flex; justify-content: center; gap: 16px; margin-top: 10px; }
+    .settings-actions button { padding: 10px 32px; font-size: 16px; font-weight: bold;
+        border: none; border-radius: 4px; cursor: pointer; }
+    .btn-save { background: var(--gold); color: #000; }
+    .btn-save:hover { background: #e6c34a; }
+    .btn-cancel { background: #6b453a; color: #fff; }
+    .btn-cancel:hover { background: #8a5a4a; }
+    .btn-reset { background: var(--red); color: #fff; }
+    .btn-reset:hover { background: #e53935; }
+    .settings-hint { color: #bbb; font-size: 12px; text-align: center; margin-top: 4px; }
+
+    /* ===== 布局预设 ===== */
+    .screen.layout-bigroad #beadPlateCanvas { height: 380px; }
+    .screen.layout-bigroad #bigRoadCanvas { top: 383px; height: 400px; }
+    .screen.layout-bigroad #topBottomRoadCanvas { top: 786px; }
+    .screen.layout-bigroad #bottomRoadCanvas { top: 879px; }
+
+    .screen.layout-compact #topBottomRoadCanvas,
+    .screen.layout-compact #bottomRoadCanvas { display: none; }
+    .screen.layout-compact #beadPlateCanvas { height: 520px; }
+    .screen.layout-compact #bigRoadCanvas { top: 523px; height: 440px; }
+
+    .screen.layout-beadonly #bigRoadCanvas,
+    .screen.layout-beadonly #topBottomRoadCanvas,
+    .screen.layout-beadonly #bottomRoadCanvas { display: none; }
+    .screen.layout-beadonly #beadPlateCanvas { height: 995px; width: 1920px; }
+    .screen.layout-beadonly .right-panel { display: none; }
+
+    /* ===== 倒计时 ===== */
+    @keyframes cdFlash {
+        0%,100% { background: var(--red); color:#fff; }
+        50%     { background: var(--text-gold); color:#000; }
+    }
+    .cd-alert { animation: cdFlash 0.6s ease-in-out 3; }
+
+    /* ===== 隐藏开关：顶栏右侧工具区 ===== */
+    .screen.hide-top-tools .top-right .score-tag#cdWrap,
+    .screen.hide-top-tools #btnFullscreen,
+    .screen.hide-top-tools #openSettingsBtn { display: none; }
+
+    /* ===== 隐藏开关：对子统计 / 对子限红 ===== */
+    .screen.hide-pair .stat-row[data-key="pair"],
+    .screen.hide-pair .limit-row[data-key="pair"] { display: none; }
+
+    /* ===== 隐藏开关：状态栏 ===== */
+    .screen.show-status .status-bar { display: block; }
+</style>
+</head>
+<body>
+
+<div class="screen" id="screen">
+    <div class="top-banner">
+        <div class="top-left">
+            <div class="min-max">
+                <div class="min-box">MIN <span id="minVal">100</span></div>
+                <div class="max-box">MAX <span id="maxVal">5,000</span></div>
+            </div>
+            <div class="info-item" data-i18n="table">台桌号 <b id="tableName">龙虎1</b></div>
+            <div class="info-item" data-i18n="shoe">靴数 <b id="shoeNum">2</b></div>
+            <div class="info-item" data-i18n="date">日期 <b id="dateVal">--</b></div>
+            <div class="info-item" data-i18n="time">时间 <b id="timeVal">--:--</b></div>
+        </div>
+        <div class="top-right">
+            <div class="score-tag">
+                <div class="label banker" data-i18n="dragon">DRAGON 龙</div>
+                <div class="num" id="dragonScore">0</div>
+            </div>
+            <div class="score-tag">
+                <div class="label player" data-i18n="tiger">TIGER 虎</div>
+                <div class="num" id="tigerScore">0</div>
+            </div>
+            <div class="score-tag" id="cdWrap">
+                <div class="label" style="background:#455a64" data-i18n="countdown">倒计时</div>
+                <div class="num" id="cdVal" style="width:80px">--</div>
+            </div>
+            <button class="top-btn" id="btnFullscreen">⛶ 全屏 (F)</button>
+            <button class="top-btn" id="openSettingsBtn">⚙ 设置 (S)</button>
+        </div>
+    </div>
+
+    <div class="road-area">
+        <div class="road-canvas" id="beadPlateCanvas">
+            <div class="grid-title" data-i18n="beadPlate">珠盘路</div>
+            <svg class="grid-svg" id="beadPlateSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></svg>
+        </div>
+        <div class="road-canvas" id="bigRoadCanvas">
+            <div class="grid-title" data-i18n="bigRoad">大路</div>
+            <svg class="grid-svg" id="bigRoadSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></svg>
+        </div>
+        <div class="road-canvas" id="topBottomRoadCanvas">
+            <div class="bottom-road-half">
+                <div class="grid-title" data-i18n="bigEye">大眼仔</div>
+                <svg class="grid-svg" id="bigEyeSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></svg>
+            </div>
+            <div class="bottom-road-half">
+                <div class="grid-title" data-i18n="cockroach">曱甴路</div>
+                <svg class="grid-svg" id="cockroachSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></svg>
+            </div>
+        </div>
+        <div class="road-canvas" id="bottomRoadCanvas">
+            <div class="bottom-road-half">
+                <div class="grid-title" data-i18n="smallRoad">小路</div>
+                <svg class="grid-svg" id="smallRoadSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></svg>
+            </div>
+            <div class="bottom-road-half">
+                <div class="grid-title" data-i18n="threeStar">三星路</div>
+                <svg class="grid-svg" id="threeStarSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;"></svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 右侧面板：左中右三列 ===== -->
+    <div class="right-panel">
+        <!-- 左列：统计 -->
+        <div class="panel-col col-stats">
+            <div class="stat-row">
+                <span class="label"><span class="icon" style="background:var(--green)">和</span><span data-i18n="statTie">和 TIE</span></span>
+                <span class="val" id="statTie">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="label"><span class="icon" style="background:var(--red)">龙</span><span data-i18n="statDragon">龙 DRAGON</span></span>
+                <span class="val" id="statDragon">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="label"><span class="icon" style="background:var(--blue)">虎</span><span data-i18n="statTiger">虎 TIGER</span></span>
+                <span class="val" id="statTiger">0</span>
+            </div>
+            <div class="stat-row" data-key="pair">
+                <span class="label"><span class="icon" style="background:#7b1fa2">对</span><span data-i18n="statPair">对子 PAIR</span></span>
+                <span class="val" id="statPair">0</span>
+            </div>
+        </div>
+
+        <!-- 中列：USD + LOGO + 问路 -->
+        <div class="panel-col middle">
+            <div class="currency-box">
+                <div class="title" data-i18n="currency">CURRENCY / CURRENCY</div>
+                <div class="value" id="currencyVal">USD</div>
+            </div>
+
+            <div class="no-smoking">
+                <div class="icon">🚭</div>
+                <div class="text" data-i18n="noSmoking">NO SMOKING / NO SMOKING</div>
+            </div>
+
+            <div class="askroad-mini">
+                <div class="title" data-i18n="askRoad">问路（下一局预测）/ Ask Road (Next)</div>
+                <div class="askrow">
+                    <div class="asklabel banker"><span>龙</span><span class="en">D</span></div>
+                    <svg id="askBigEyeB" width="44" height="44" viewBox="0 0 44 44"></svg>
+                    <svg id="askSmallB" width="44" height="44" viewBox="0 0 44 44"></svg>
+                    <svg id="askCockB" width="44" height="44" viewBox="0 0 44 44"></svg>
+                </div>
+                <div class="askrow">
+                    <div class="asklabel player"><span>虎</span><span class="en">T</span></div>
+                    <svg id="askBigEyeP" width="44" height="44" viewBox="0 0 44 44"></svg>
+                    <svg id="askSmallP" width="44" height="44" viewBox="0 0 44 44"></svg>
+                    <svg id="askCockP" width="44" height="44" viewBox="0 0 44 44"></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右列：限红 -->
+        <div class="panel-col col-limits">
+            <div class="limit-row">
+                <span class="label" data-i18n="limitDragon">龙 / Dragon</span>
+                <span class="val" id="limitDragon">100&nbsp;&nbsp;5,000</span>
+            </div>
+            <div class="limit-row">
+                <span class="label" data-i18n="limitTiger">虎 / Tiger</span>
+                <span class="val" id="limitTiger">100&nbsp;&nbsp;5,000</span>
+            </div>
+            <div class="limit-row">
+                <span class="label" data-i18n="limitTie">和 / Tie</span>
+                <span class="val" id="limitTie">100&nbsp;&nbsp;5,000</span>
+            </div>
+            <div class="limit-row" data-key="pair">
+                <span class="label" data-i18n="limitPair">对子 / Pair</span>
+                <span class="val" id="limitPair">100&nbsp;&nbsp;5,000</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-bar">
+        <div class="footer-marquee" id="footerMarquee">Dragon Tiger Games, Good Luck !! 欢迎光临龙虎，祝您好运！！ Welcome To Dragon Tiger, Good Luck !!</div>
+    </div>
+
+    <div class="status-bar" id="statusBar">就绪：1龙 2虎 3和 4对子 | 14龙对子 24虎对子 | /设置 回车确认</div>
+    <div class="flash" id="flashMsg"></div>
+
+    <div class="settings-mask" id="settingsMask">
+        <div class="settings-panel">
+            <h2>⚙ 设置</h2>
+            <h3>基础信息</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>台桌号</label><input type="text" id="setTableName"></div>
+                <div class="settings-row"><label>靴数</label><input type="number" id="setShoeNum" min="0"></div>
+                <div class="settings-row"><label>MIN</label><input type="text" id="setMinVal"></div>
+                <div class="settings-row"><label>MAX</label><input type="text" id="setMaxVal"></div>
+                <div class="settings-row"><label>货币</label><input type="text" id="setCurrency"></div>
+                <div class="settings-row"><label>底部字幕</label><input type="text" id="setFooter"></div>
+            </div>
+
+            <h3>日期时间设置</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>时间模式</label>
+                    <select id="setTimeMode">
+                        <option value="auto">自动（跟随系统）</option>
+                        <option value="manual">手动固定</option>
+                    </select>
+                </div>
+                <div class="settings-row"><label>时区</label>
+                    <select id="setTimeZone">
+                        <option value="local">自动（跟随设备本地时区）</option>
+                        <option value="7">UTC+7 (柬埔寨/泰国/越南)</option>
+                        <option value="8">UTC+8 (中国/新加坡/马来西亚)</option>
+                        <option value="9">UTC+9 (日本/韩国)</option>
+                        <option value="0">UTC+0 (伦敦)</option>
+                        <option value="-5">UTC-5 (纽约)</option>
+                        <option value="-8">UTC-8 (洛杉矶)</option>
+                    </select>
+                </div>
+                <div class="settings-row" id="manualDateRow"><label>日期</label><input type="date" id="setManualDate"></div>
+                <div class="settings-row" id="manualTimeRow"><label>时间</label><input type="time" id="setManualTime"></div>
+            </div>
+
+            <h3>主界面颜色</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>背景色</label>
+                    <input type="color" id="setColorBg">
+                </div>
+                <div class="settings-row"><label>面板色</label>
+                    <input type="color" id="setColorPanel">
+                </div>
+                <div class="settings-row"><label>边框/金色</label>
+                    <input type="color" id="setColorGold">
+                </div>
+                <div class="settings-row"><label>金色文字</label>
+                    <input type="color" id="setColorTextGold">
+                </div>
+                <div class="settings-row"><label>牌路底色</label>
+                    <input type="color" id="setColorCell">
+                </div>
+            </div>
+
+            <h3>界面显示</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>顶栏工具区</label>
+                    <select id="setHideTopTools">
+                        <option value="0">显示（全屏/设置/倒计时）</option>
+                        <option value="1">隐藏</option>
+                    </select>
+                </div>
+                <div class="settings-row"><label>状态栏</label>
+                    <select id="setShowStatus">
+                        <option value="0">隐藏</option>
+                        <option value="1">显示</option>
+                    </select>
+                </div>
+                <div class="settings-row"><label>对子统计</label>
+                    <select id="setHidePairStat">
+                        <option value="0">显示</option>
+                        <option value="1">隐藏</option>
+                    </select>
+                </div>
+                <div class="settings-row"><label>对子限红</label>
+                    <select id="setHidePairLimit">
+                        <option value="0">显示</option>
+                        <option value="1">隐藏</option>
+                    </select>
+                </div>
+            </div>
+
+            <h3>语言 / Language</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>语言</label>
+                    <select id="setLang">
+                        <option value="zh">中文</option>
+                        <option value="en">English</option>
+                        <option value="both">中英双语</option>
+                    </select>
+                </div>
+            </div>
+
+            <h3>布局 / Layout</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>布局方案</label>
+                    <select id="setLayout">
+                        <option value="standard">标准（珠盘路+大路+下三路）</option>
+                        <option value="bigroad">大路优先（大路加高）</option>
+                        <option value="compact">紧凑（隐藏下三路）</option>
+                        <option value="beadonly">仅珠盘路</option>
+                    </select>
+                </div>
+            </div>
+
+            <h3>倒计时 / Countdown</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>显示倒计时</label>
+                    <select id="setCdShow">
+                        <option value="1">显示</option>
+                        <option value="0">隐藏</option>
+                    </select>
+                </div>
+                <div class="settings-row"><label>时长（秒）</label>
+                    <input type="number" id="setCdSeconds" min="5" max="600" step="5">
+                </div>
+                <div class="settings-row"><label>到点后</label>
+                    <select id="setCdMode">
+                        <option value="stop">停止</option>
+                        <option value="loop">自动重新开始</option>
+                    </select>
+                </div>
+                <div class="settings-row"><label>到点提示</label>
+                    <select id="setCdAlert">
+                        <option value="1">闪烁</option>
+                        <option value="0">不提示</option>
+                    </select>
+                </div>
+            </div>
+
+            <h3>限红设置（格式：最小 最大）</h3>
+            <div class="settings-grid">
+                <div class="settings-row"><label>龙</label><input type="text" id="setLimitDragon"></div>
+                <div class="settings-row"><label>虎</label><input type="text" id="setLimitTiger"></div>
+                <div class="settings-row"><label>和</label><input type="text" id="setLimitTie"></div>
+                <div class="settings-row"><label>对子</label><input type="text" id="setLimitPair"></div>
+            </div>
+            <div class="settings-actions">
+                <button class="btn-save" id="btnSave">保存并关闭</button>
+                <button class="btn-cancel" id="btnCancel">取消</button>
+                <button class="btn-reset" id="btnReset">恢复默认</button>
+            </div>
+            <div class="settings-hint">提示：按 / 打开设置，ESC 关闭；F 切换全屏；* 退出；限红用空格分隔最小值和最大值</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    // ================== i18n ==================
+    const I18N = {
+        zh: {
+            title: '龙虎大屏',
+            table: '台桌号', shoe: '靴数', date: '日期', time: '时间',
+            dragon: 'DRAGON 龙', tiger: 'TIGER 虎',
+            beadPlate: '珠盘路', bigRoad: '大路',
+            bigEye: '大眼仔', cockroach: '曱甴路',
+            smallRoad: '小路', threeStar: '三星路',
+            statDragon: '龙 DRAGON', statTiger: '虎 TIGER',
+            statTie: '和 TIE', statPair: '对子 PAIR',
+            currency: 'CURRENCY / CURRENCY', noSmoking: 'NO SMOKING / NO SMOKING',
+            askRoad: '问路（下一局预测）/ Ask Road (Next)',
+            askDragon: '龙', askTiger: '虎',
+            limitDragon: '龙 / Dragon', limitTiger: '虎 / Tiger',
+            limitTie: '和 / Tie', limitPair: '对子 / Pair',
+            countdown: '倒计时'
+        },
+        en: {
+            title: 'Dragon Tiger Screen',
+            table: 'Table', shoe: 'Shoe', date: 'Date', time: 'Time',
+            dragon: 'DRAGON', tiger: 'TIGER',
+            beadPlate: 'Bead Plate', bigRoad: 'Big Road',
+            bigEye: 'Big Eye', cockroach: 'Cockroach',
+            smallRoad: 'Small Road', threeStar: 'Three Star',
+            statDragon: 'DRAGON', statTiger: 'TIGER',
+            statTie: 'TIE', statPair: 'PAIR',
+            currency: 'CURRENCY', noSmoking: 'NO SMOKING',
+            askRoad: 'Ask Road (Next)',
+            askDragon: 'D', askTiger: 'T',
+            limitDragon: 'Dragon', limitTiger: 'Tiger',
+            limitTie: 'Tie', limitPair: 'Pair',
+            countdown: 'Countdown'
+        }
+    };
+    function t(key) {
+        const lang = settings.lang || 'zh';
+        if (lang === 'both') return I18N.zh[key] + ' / ' + I18N.en[key];
+        return (I18N[lang] && I18N[lang][key]) || key;
+    }
+    function applyLang() {
+        document.title = t('title');
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            let replaced = false;
+            el.childNodes.forEach(n => {
+                if (n.nodeType === 3 && n.textContent.trim()) {
+                    if (!replaced) { n.textContent = t(key) + ' '; replaced = true; }
+                    else { n.textContent = ' '; }
+                }
+            });
+            if (!replaced && el.children.length === 0) el.textContent = t(key);
+        });
+    }
+
+    // ================== 下三路计算 ==================
+    function buildLogicalColumns(rawHistory) {
+        const columns = [], positions = [];
+        for (let i = 0; i < rawHistory.length; i++) {
+            const t = rawHistory[i];
+            if (columns.length === 0) {
+                columns.push({ outcome: t, depth: 1 });
+                positions.push({ colIdx: 0, depthPos: 1 });
+            } else {
+                const last = columns[columns.length - 1];
+                if (last.outcome === t) {
+                    last.depth += 1;
+                    positions.push({ colIdx: columns.length - 1, depthPos: last.depth });
+                } else {
+                    columns.push({ outcome: t, depth: 1 });
+                    positions.push({ colIdx: columns.length - 1, depthPos: 1 });
+                }
+            }
+        }
+        return { columns, positions };
+    }
+    function computeDerivedSignals(rawHistory, k) {
+        const { columns, positions } = buildLogicalColumns(rawHistory);
+        const signals = [];
+        for (let i = 0; i < positions.length; i++) {
+            const n = positions[i].colIdx;
+            const m = positions[i].depthPos;
+            if (m >= 2) {
+                const compareCol = n - k;
+                if (compareCol < 0) continue;
+                const p = columns[compareCol].depth;
+                if (m <= p) signals.push('RED');
+                else if (m === p + 1) signals.push('BLUE');
+                else signals.push('RED');
+            } else {
+                const leftCol = n - 1;
+                const kDistCol = n - 1 - k;
+                if (leftCol < 0 || kDistCol < 0) continue;
+                const d1 = columns[leftCol].depth;
+                const d2 = columns[kDistCol].depth;
+                signals.push(d1 === d2 ? 'RED' : 'BLUE');
+            }
+        }
+        return signals;
+    }
+    function getBigRoadPositions(rawHistory, rows) {
+        rows = rows || 6;
+        const matrix = {}, positions = [];
+        let last_r = -1, last_c = -1, is_dragon = false;
+        for (let i = 0; i < rawHistory.length; i++) {
+            const current = rawHistory[i];
+            if (last_r === -1) {
+                matrix["0_0"] = current; last_r = 0; last_c = 0;
+                positions.push({ r: 0, c: 0, val: current }); continue;
+            }
+            const last_value = matrix[`${last_r}_${last_c}`];
+            if (current === last_value) {
+                if (!is_dragon) {
+                    let next_r = last_r + 1;
+                    if (next_r >= rows || matrix[`${next_r}_${last_c}`] !== undefined) {
+                        is_dragon = true; last_c = last_c + 1;
+                    } else { last_r = next_r; }
+                } else { last_c = last_c + 1; }
+                while (matrix[`${last_r}_${last_c}`] !== undefined) last_c += 1;
+            } else {
+                is_dragon = false; last_r = 0;
+                let find_c = 0;
+                while (matrix[`0_${find_c}`] !== undefined) find_c += 1;
+                last_c = find_c;
+            }
+            matrix[`${last_r}_${last_c}`] = current;
+            positions.push({ r: last_r, c: last_c, val: current });
+        }
+        return { matrix, positions };
+    }
+
+    class BaccaratRoadEngine {
+        constructor() { this.ROWS_STANDARD = 6; this.ROWS_THREE_STAR = 3; }
+        _calculateBigRoadMatrix(h) { return getBigRoadPositions(h, this.ROWS_STANDARD).matrix; }
+        _calculateThreeStarRoad(h) {
+            return h.map((outcome, index) => ({
+                row: index % this.ROWS_THREE_STAR,
+                col: Math.floor(index / this.ROWS_THREE_STAR),
+                value: outcome
+            }));
+        }
+        calculateAskRoad(rawHistory) {
+            const mockB = rawHistory.concat(['B']);
+            const mockP = rawHistory.concat(['P']);
+            function lastColor(hist, k) {
+                const signals = computeDerivedSignals(hist, k);
+                return signals.length > 0 ? signals[signals.length - 1] : null;
+            }
+            return {
+                askBanker: { bigEye: lastColor(mockB, 1), smallRoad: lastColor(mockB, 2), cockroach: lastColor(mockB, 3) },
+                askPlayer: { bigEye: lastColor(mockP, 1), smallRoad: lastColor(mockP, 2), cockroach: lastColor(mockP, 3) }
+            };
+        }
+    }
+    const engine = new BaccaratRoadEngine();
+
+    function getPerfectStandardDerivedRoads(rawHistory) {
+        const bigEyeSignals = computeDerivedSignals(rawHistory, 1);
+        const smallSignals  = computeDerivedSignals(rawHistory, 2);
+        const cockSignals   = computeDerivedSignals(rawHistory, 3);
+        function renderRoad(signals) {
+            const matrix = {};
+            let last_r = -1, last_c = -1, is_dragon = false;
+            return signals.map((color) => {
+                if (last_r === -1) {
+                    matrix["0_0"] = color; last_r = 0; last_c = 0;
+                    return { row: 0, col: 0, color };
+                }
+                const last_color = matrix[`${last_r}_${last_c}`];
+                if (color === last_color) {
+                    if (!is_dragon) {
+                        let next_r = last_r + 1;
+                        if (next_r >= 6 || matrix[`${next_r}_${last_c}`] !== undefined) {
+                            is_dragon = true; last_c = last_c + 1;
+                        } else { last_r = next_r; }
+                    } else { last_c = last_c + 1; }
+                    while (matrix[`${last_r}_${last_c}`] !== undefined) last_c += 1;
+                } else {
+                    is_dragon = false; last_r = 0;
+                    let find_c = 0;
+                    while (matrix[`0_${find_c}`] !== undefined) find_c += 1;
+                    last_c = find_c;
+                }
+                matrix[`${last_r}_${last_c}`] = color;
+                return { row: last_r, col: last_c, color };
+            });
+        }
+        return { bigEye: renderRoad(bigEyeSignals), small: renderRoad(smallSignals), cockroach: renderRoad(cockSignals) };
+    }
+
+    // ================== 绘制 ==================
+    function initGrid(svgId, rows, cols, cellW, cellH) {
+        const svg = document.getElementById(svgId);
+        if (!svg) return;
+        svg.innerHTML = '';
+        const totalW = cols * cellW, totalH = rows * cellH;
+        svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+        svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+        for (let r = 0; r <= rows; r++) {
+            const line = document.createElementNS(SVG_NS, 'line');
+            line.setAttribute('x1', 0); line.setAttribute('y1', r * cellH);
+            line.setAttribute('x2', totalW); line.setAttribute('y2', r * cellH);
+            line.setAttribute('stroke', '#999'); line.setAttribute('stroke-width', '1');
+            svg.appendChild(line);
+        }
+        for (let c = 0; c <= cols; c++) {
+            const line = document.createElementNS(SVG_NS, 'line');
+            line.setAttribute('x1', c * cellW); line.setAttribute('y1', 0);
+            line.setAttribute('x2', c * cellW); line.setAttribute('y2', totalH);
+            line.setAttribute('stroke', '#999'); line.setAttribute('stroke-width', '1');
+            svg.appendChild(line);
+        }
+    }
+    function drawSolid(svgId, row, col, color, text, cellW, cellH, extra) {
+        extra = extra || {};
+        const svg = document.getElementById(svgId);
+        const cx = col * cellW + cellW / 2, cy = row * cellH + cellH / 2;
+        const r = Math.min(cellW, cellH) * 0.42;
+        const circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', color === 'R' ? '#d32f2f' : (color === 'B' ? '#1976d2' : '#388e3c'));
+        svg.appendChild(circle);
+        if (text) {
+            const t = document.createElementNS(SVG_NS, 'text');
+            t.setAttribute('x', cx); t.setAttribute('y', cy + r * 0.35);
+            t.setAttribute('text-anchor', 'middle'); t.setAttribute('fill', '#fff');
+            t.setAttribute('font-size', r * 1.0); t.setAttribute('font-weight', 'bold');
+            t.setAttribute('font-family', 'Microsoft YaHei');
+            t.textContent = text;
+            svg.appendChild(t);
+        }
+        if (extra.pair === 'PAIR') {
+            const dot = document.createElementNS(SVG_NS, 'circle');
+            dot.setAttribute('cx', cx + r * 0.65); dot.setAttribute('cy', cy - r * 0.65);
+            dot.setAttribute('r', r * 0.22); dot.setAttribute('fill', '#ffeb3b');
+            dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '2');
+            svg.appendChild(dot);
+        } else {
+            if (extra.pair === 'BP' || extra.pair2 === 'BP') {
+                const dot = document.createElementNS(SVG_NS, 'circle');
+                dot.setAttribute('cx', cx - r * 0.7); dot.setAttribute('cy', cy - r * 0.7);
+                dot.setAttribute('r', r * 0.22); dot.setAttribute('fill', '#d32f2f');
+                dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '2');
+                svg.appendChild(dot);
+            }
+            if (extra.pair === 'PP' || extra.pair2 === 'PP') {
+                const dot = document.createElementNS(SVG_NS, 'circle');
+                dot.setAttribute('cx', cx + r * 0.7); dot.setAttribute('cy', cy + r * 0.7);
+                dot.setAttribute('r', r * 0.22); dot.setAttribute('fill', '#1976d2');
+                dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '2');
+                svg.appendChild(dot);
+            }
+        }
+    }
+    function drawHollow(svgId, row, col, color, cellW, cellH, extra) {
+        extra = extra || {};
+        const svg = document.getElementById(svgId);
+        const cx = col * cellW + cellW / 2, cy = row * cellH + cellH / 2;
+        const r = Math.min(cellW, cellH) * 0.38;
+        const circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', (color === 'RED' || color === 'R') ? '#d32f2f' : '#1976d2');
+        circle.setAttribute('stroke-width', '2');
+        svg.appendChild(circle);
+        const tieCount = extra.tieCount || (extra.tie ? 1 : 0);
+        if (tieCount > 0) {
+            const size = r * 0.7;
+            for (let t = 0; t < Math.min(tieCount, 3); t++) {
+                const offset = (t - (Math.min(tieCount, 3) - 1) / 2) * (r * 0.35);
+                const line = document.createElementNS(SVG_NS, 'line');
+                line.setAttribute('x1', cx - size + offset);
+                line.setAttribute('y1', cy + size);
+                line.setAttribute('x2', cx + size + offset);
+                line.setAttribute('y2', cy - size);
+                line.setAttribute('stroke', '#388e3c');
+                line.setAttribute('stroke-width', '2.5');
+                line.setAttribute('stroke-linecap', 'round');
+                svg.appendChild(line);
+            }
+        }
+    }
+    function drawSolidSmall(svgId, row, col, color, cellW, cellH) {
+        const svg = document.getElementById(svgId);
+        const cx = col * cellW + cellW / 2, cy = row * cellH + cellH / 2;
+        const r = Math.min(cellW, cellH) * 0.38;
+        const circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', (color === 'RED' || color === 'R') ? '#d32f2f' : '#1976d2');
+        svg.appendChild(circle);
+    }
+    function drawSlash(svgId, row, col, color, cellW, cellH) {
+        const svg = document.getElementById(svgId);
+        const cx = col * cellW + cellW / 2, cy = row * cellH + cellH / 2;
+        const size = Math.min(cellW, cellH) * 0.4;
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('x1', cx - size); line.setAttribute('y1', cy + size);
+        line.setAttribute('x2', cx + size); line.setAttribute('y2', cy - size);
+        line.setAttribute('stroke', (color === 'RED' || color === 'R') ? '#d32f2f' : '#1976d2');
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+    }
+    const ICON_MAP = {
+        'BT': 'big_tiger.png', 'D7': 'dragon7.png', 'P8': 'panda8.png',
+        'ST': 'small_tiger.png', 'L6': 'lucky6.png'
+    };
+    function drawSpecialIcon(svgId, row, col, iconType, cellW, cellH) {
+        const svg = document.getElementById(svgId);
+        const cx = col * cellW + cellW / 2, cy = row * cellH + cellH / 2;
+        const r = Math.min(cellW, cellH) * 0.45;
+        const img = document.createElementNS(SVG_NS, 'image');
+        img.setAttribute('href', ICON_MAP[iconType]);
+        img.setAttribute('x', cx - r); img.setAttribute('y', cy - r);
+        img.setAttribute('width', r * 2); img.setAttribute('height', r * 2);
+        img.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        svg.appendChild(img);
+    }
+
+    // ================== 设置 ==================
+    const STORAGE_KEY = 'dragontiger_screen_v4';
+    const SETTINGS_KEY = 'dragontiger_settings_v4';
+
+    const DEFAULT_SETTINGS = {
+        tableName: '龙虎1', shoeNum: '2', minVal: '100', maxVal: '5,000',
+        currency: 'USD',
+        footer: 'Dragon Tiger Games, Good Luck !! 欢迎光临龙虎，祝您好运！！ Welcome To Dragon Tiger, Good Luck !!',
+        limitDragon: '100  5,000', limitTiger: '100  5,000', limitTie: '100  5,000', limitPair: '100  5,000',
+        lang: 'both',
+        layout: 'standard',
+        cdShow: 1,
+        cdSeconds: 30,
+        cdMode: 'stop',
+        cdAlert: 1,
+        // 颜色
+        colorBg: '#2b1a15',
+        colorPanel: '#3d231d',
+        colorGold: '#d4af37',
+        colorTextGold: '#ffeb3b',
+        colorCell: '#f5efe6',
+        hideTopTools: 1,
+        showStatus: 0,
+        hidePairStat: 0,
+        hidePairLimit: 0,
+        // 日期时间设置
+        timeMode: 'auto',        // auto = 跟随系统, manual = 手动固定
+        timeZone: 'local',       // local = 跟随设备本地时区, 数字 = 指定时区偏移
+        manualDate: '',          // 格式 YYYY-MM-DD
+        manualTime: ''           // 格式 HH:MM
+    };
+    let settings = Object.assign({}, DEFAULT_SETTINGS);
+
+    function loadSettings() {
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (raw) settings = Object.assign({}, DEFAULT_SETTINGS, JSON.parse(raw));
+        } catch (e) {}
+    }
+    function saveSettings() {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+    }
+    function applySettings() {
+        document.getElementById('tableName').textContent = settings.tableName;
+        document.getElementById('shoeNum').textContent = settings.shoeNum;
+        document.getElementById('minVal').textContent = settings.minVal;
+        document.getElementById('maxVal').textContent = settings.maxVal;
+        document.getElementById('currencyVal').textContent = settings.currency;
+        document.getElementById('footerMarquee').textContent = settings.footer;
+        document.getElementById('limitDragon').textContent = settings.limitDragon;
+        document.getElementById('limitTiger').textContent = settings.limitTiger;
+        document.getElementById('limitTie').textContent = settings.limitTie;
+        document.getElementById('limitPair').textContent = settings.limitPair;
+        applyColors();
+        applyLang();
+        applyLayout(settings.layout);
+        applyCountdownSetting();
+        applyVisibility();
+        applyDateTimeSetting();
+    }
+
+    // ===== 颜色 =====
+    function applyColors() {
+        const root = document.documentElement.style;
+        root.setProperty('--bg-dark', settings.colorBg);
+        root.setProperty('--bg-panel', settings.colorPanel);
+        root.setProperty('--gold', settings.colorGold);
+        root.setProperty('--text-gold', settings.colorTextGold);
+        root.setProperty('--cell-bg', settings.colorCell);
+    }
+
+    // ===== 布局 =====
+    function applyLayout(name) {
+        const screen = document.getElementById('screen');
+        screen.classList.remove('layout-bigroad', 'layout-compact', 'layout-beadonly');
+        if (name && name !== 'standard') screen.classList.add('layout-' + name);
+        setTimeout(() => { renderAll(); resizeScreen(); }, 0);
+    }
+
+    // ===== 显示 / 隐藏 =====
+    function applyVisibility() {
+        const screen = document.getElementById('screen');
+        screen.classList.toggle('hide-top-tools', !!settings.hideTopTools);
+        screen.classList.toggle('show-status', !!settings.showStatus);
+        screen.classList.toggle('hide-pair', !!settings.hidePairStat || !!settings.hidePairLimit);
+        const statPair = document.querySelector('.stat-row[data-key="pair"]');
+        if (statPair) statPair.style.display = settings.hidePairStat ? 'none' : '';
+        const limitPair = document.querySelector('.limit-row[data-key="pair"]');
+        if (limitPair) limitPair.style.display = settings.hidePairLimit ? 'none' : '';
+    }
+
+    // ===== 日期时间 =====
+    function applyDateTimeSetting() {
+        if (settings.timeMode === 'manual') {
+            updateManualDateTime();
+        } else {
+            tickClock();
+        }
+    }
+    function updateManualDateTime() {
+        const dateEl = document.getElementById('dateVal');
+        const timeEl = document.getElementById('timeVal');
+        if (settings.manualDate) {
+            dateEl.textContent = settings.manualDate;
+        }
+        if (settings.manualTime) {
+            timeEl.textContent = settings.manualTime;
+        }
+    }
+
+    // ===== 倒计时 =====
+    let cdTimer = null, cdRemain = 0;
+    function applyCountdownSetting() {
+        const wrap = document.getElementById('cdWrap');
+        wrap.style.display = (settings.cdShow && !settings.hideTopTools) ? '' : 'none';
+        startCountdown();
+    }
+    function startCountdown() {
+        if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
+        cdRemain = settings.cdSeconds;
+        updateCdDisplay();
+        if (!settings.cdShow || settings.hideTopTools) return;
+        cdTimer = setInterval(() => {
+            cdRemain--;
+            if (cdRemain <= 0) {
+                if (settings.cdAlert) {
+                    const el = document.getElementById('cdVal');
+                    el.classList.add('cd-alert');
+                    setTimeout(() => el.classList.remove('cd-alert'), 2000);
+                }
+                if (settings.cdMode === 'loop') { cdRemain = settings.cdSeconds; }
+                else { clearInterval(cdTimer); cdTimer = null; cdRemain = 0; }
+            }
+            updateCdDisplay();
+        }, 1000);
+    }
+    function updateCdDisplay() {
+        const m = Math.floor(cdRemain / 60), s = cdRemain % 60;
+        document.getElementById('cdVal').textContent =
+            String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }
+
+    function openSettings() {
+        document.getElementById('setTableName').value = settings.tableName;
+        document.getElementById('setShoeNum').value = settings.shoeNum;
+        document.getElementById('setMinVal').value = settings.minVal;
+        document.getElementById('setMaxVal').value = settings.maxVal;
+        document.getElementById('setCurrency').value = settings.currency;
+        document.getElementById('setFooter').value = settings.footer;
+        document.getElementById('setLimitDragon').value = settings.limitDragon;
+        document.getElementById('setLimitTiger').value = settings.limitTiger;
+        document.getElementById('setLimitTie').value = settings.limitTie;
+        document.getElementById('setLimitPair').value = settings.limitPair;
+        document.getElementById('setColorBg').value = settings.colorBg;
+        document.getElementById('setColorPanel').value = settings.colorPanel;
+        document.getElementById('setColorGold').value = settings.colorGold;
+        document.getElementById('setColorTextGold').value = settings.colorTextGold;
+        document.getElementById('setColorCell').value = settings.colorCell;
+        document.getElementById('setHideTopTools').value = settings.hideTopTools ? '1' : '0';
+        document.getElementById('setShowStatus').value = settings.showStatus ? '1' : '0';
+        document.getElementById('setHidePairStat').value = settings.hidePairStat ? '1' : '0';
+        document.getElementById('setHidePairLimit').value = settings.hidePairLimit ? '1' : '0';
+        document.getElementById('setLang').value = settings.lang;
+        document.getElementById('setLayout').value = settings.layout;
+        document.getElementById('setCdShow').value = settings.cdShow ? '1' : '0';
+        document.getElementById('setCdSeconds').value = settings.cdSeconds;
+        document.getElementById('setCdMode').value = settings.cdMode;
+        document.getElementById('setCdAlert').value = settings.cdAlert ? '1' : '0';
+        // 日期时间
+        document.getElementById('setTimeMode').value = settings.timeMode || 'auto';
+        document.getElementById('setTimeZone').value = settings.timeZone || 'local';
+        document.getElementById('setManualDate').value = settings.manualDate || '';
+        document.getElementById('setManualTime').value = settings.manualTime || '';
+        toggleManualDateInputs();
+        document.getElementById('settingsMask').classList.add('show');
+    }
+    function closeSettings() { document.getElementById('settingsMask').classList.remove('show'); }
+    function toggleManualDateInputs() {
+        const mode = document.getElementById('setTimeMode').value;
+        const show = mode === 'manual';
+        document.getElementById('manualDateRow').style.display = show ? '' : 'none';
+        document.getElementById('manualTimeRow').style.display = show ? '' : 'none';
+        if (show) {
+            const dateEl = document.getElementById('setManualDate');
+            const timeEl = document.getElementById('setManualTime');
+            const pad = n => String(n).padStart(2, '0');
+            if (!dateEl.value) {
+                const now = new Date();
+                dateEl.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+            }
+            if (!timeEl.value) {
+                const now = new Date();
+                timeEl.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            }
+        }
+    }
+    function saveSettingsFromForm() {
+        settings.tableName = document.getElementById('setTableName').value.trim() || DEFAULT_SETTINGS.tableName;
+        settings.shoeNum = document.getElementById('setShoeNum').value.trim() || DEFAULT_SETTINGS.shoeNum;
+        settings.minVal = document.getElementById('setMinVal').value.trim() || DEFAULT_SETTINGS.minVal;
+        settings.maxVal = document.getElementById('setMaxVal').value.trim() || DEFAULT_SETTINGS.maxVal;
+        settings.currency = document.getElementById('setCurrency').value.trim() || DEFAULT_SETTINGS.currency;
+        settings.footer = document.getElementById('setFooter').value.trim() || DEFAULT_SETTINGS.footer;
+        settings.limitDragon = document.getElementById('setLimitDragon').value.trim() || DEFAULT_SETTINGS.limitDragon;
+        settings.limitTiger = document.getElementById('setLimitTiger').value.trim() || DEFAULT_SETTINGS.limitTiger;
+        settings.limitTie = document.getElementById('setLimitTie').value.trim() || DEFAULT_SETTINGS.limitTie;
+        settings.limitPair = document.getElementById('setLimitPair').value.trim() || DEFAULT_SETTINGS.limitPair;
+        settings.colorBg = document.getElementById('setColorBg').value;
+        settings.colorPanel = document.getElementById('setColorPanel').value;
+        settings.colorGold = document.getElementById('setColorGold').value;
+        settings.colorTextGold = document.getElementById('setColorTextGold').value;
+        settings.colorCell = document.getElementById('setColorCell').value;
+        settings.hideTopTools = document.getElementById('setHideTopTools').value === '1' ? 1 : 0;
+        settings.showStatus = document.getElementById('setShowStatus').value === '1' ? 1 : 0;
+        settings.hidePairStat = document.getElementById('setHidePairStat').value === '1' ? 1 : 0;
+        settings.hidePairLimit = document.getElementById('setHidePairLimit').value === '1' ? 1 : 0;
+        settings.lang = document.getElementById('setLang').value;
+        settings.layout = document.getElementById('setLayout').value;
+        settings.cdShow = document.getElementById('setCdShow').value === '1' ? 1 : 0;
+        settings.cdSeconds = Math.max(5, Math.min(600, parseInt(document.getElementById('setCdSeconds').value) || 30));
+        settings.cdMode = document.getElementById('setCdMode').value;
+        settings.cdAlert = document.getElementById('setCdAlert').value === '1' ? 1 : 0;
+        // 日期时间
+        settings.timeMode = document.getElementById('setTimeMode').value;
+        settings.timeZone = document.getElementById('setTimeZone').value;
+        settings.manualDate = document.getElementById('setManualDate').value;
+        settings.manualTime = document.getElementById('setManualTime').value;
+        saveSettings(); applySettings(); closeSettings();
+        flash('✔ 设置已保存');
+    }
+    function resetSettings() {
+        if (!confirm('确定恢复默认设置？')) return;
+        settings = Object.assign({}, DEFAULT_SETTINGS);
+        saveSettings(); applySettings(); openSettings();
+        flash('✔ 已恢复默认');
+    }
+
+    function saveState() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ beadPlateData, stats })); } catch (e) {}
+    }
+    function loadState() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const obj = JSON.parse(raw);
+            if (Array.isArray(obj.beadPlateData)) beadPlateData = obj.beadPlateData;
+            if (obj.stats) stats = Object.assign(stats, obj.stats);
+        } catch (e) {}
+    }
+    function clearAll() {
+        if (!confirm('确定清空所有数据？')) return;
+        beadPlateData = [];
+        stats = { dragon: 0, tiger: 0, tie: 0, pair: 0 };
+        historyStack = []; pending = null;
+        for (let i = 1; i <= 40; i++) {
+            try { localStorage.removeItem('dragontiger_screen_v' + i); } catch (e) {}
+            try { localStorage.removeItem('dragontiger_settings_v' + i); } catch (e) {}
+        }
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+        renderAll(); flash('已清空'); setStatus('已清空所有数据');
+    }
+
+    // ================== 数据 ==================
+    let beadPlateData = [];
+    let historyStack = [];
+    let stats = { dragon: 0, tiger: 0, tie: 0, pair: 0 };
+    let pending = null;
+    let keySeq = [];
+    let keySeqTimer = null;
+
+    function normType(t) {
+        if (t === 'B' || t === 'D' || t === '龙' || t === 'dragon' || t === '庄' || t === 'banker') return 'B';
+        if (t === 'P' || t === '虎' || t === 'tiger' || t === '闲' || t === 'player') return 'P';
+        return null;
+    }
+
+    // ================== 渲染 ==================
+    function renderAll() {
+        ['beadPlateSvg','bigRoadSvg','bigEyeSvg','cockroachSvg','smallRoadSvg','threeStarSvg'].forEach(id => {
+            const svg = document.getElementById(id);
+            if (svg) svg.innerHTML = '';
+        });
+        initGrid('beadPlateSvg', 6, 13, 96, 96);
+        initGrid('bigRoadSvg', 6, 38, 60, 50);
+        initGrid('bigEyeSvg', 6, 64, 15, 15);
+        initGrid('cockroachSvg', 6, 64, 15, 15);
+        initGrid('smallRoadSvg', 6, 64, 15, 15);
+        initGrid('threeStarSvg', 3, 32, 30, 30);
+
+        beadPlateData.forEach((item, i) => {
+            const r = i % 6, c = Math.floor(i / 6);
+            if (item.icon) drawSpecialIcon('beadPlateSvg', r, c, item.icon, 96, 96);
+            else if (item.lucky6) drawSpecialIcon('beadPlateSvg', r, c, 'L6', 96, 96);
+            else {
+                const color = item.type === 'B' ? 'R' : (item.type === 'P' ? 'B' : 'G');
+                const pairMark = (item.isPair || item.pair === 'PAIR') ? 'PAIR' : (item.pair || null);
+                drawSolid('beadPlateSvg', r, c, color, item.text, 96, 96, { pair: pairMark, pair2: item.pair2 });
+            }
+        });
+
+        const roadEntries = [];
+        for (let i = 0; i < beadPlateData.length; i++) {
+            const item = beadPlateData[i];
+            const t = normType(item.type);
+            if (t === 'B' || t === 'P') roadEntries.push({ type: t, tieCount: 0 });
+            else if (item.type === 'T' || item.type === '和') {
+                if (roadEntries.length > 0) roadEntries[roadEntries.length - 1].tieCount++;
+            }
+        }
+        const rawHistory = roadEntries.map(e => e.type);
+        const bigRoadMatrix = engine._calculateBigRoadMatrix(rawHistory);
+        const posList = getBigRoadPositions(rawHistory, 6).positions;
+        const tieMap = {};
+        for (let i = 0; i < posList.length; i++) {
+            const key = posList[i].r + '_' + posList[i].c;
+            tieMap[key] = roadEntries[i] ? roadEntries[i].tieCount : 0;
+        }
+        for (const key in bigRoadMatrix) {
+            const [r, c] = key.split('_').map(Number);
+            const value = bigRoadMatrix[key];
+            const color = value === 'B' ? 'R' : 'B';
+            drawHollow('bigRoadSvg', r, c, color, 60, 50, { tieCount: tieMap[key] || 0 });
+        }
+
+        const roads = getPerfectStandardDerivedRoads(rawHistory);
+        roads.bigEye.forEach(item => drawHollow('bigEyeSvg', item.row, item.col, item.color, 15, 15, {}));
+        roads.small.forEach(item => drawSolidSmall('smallRoadSvg', item.row, item.col, item.color, 15, 15));
+        roads.cockroach.forEach(item => drawSlash('cockroachSvg', item.row, item.col, item.color, 15, 15));
+
+        const threeStar = engine._calculateThreeStarRoad(rawHistory);
+        threeStar.forEach(item => {
+            const color = item.value === 'B' ? 'R' : (item.value === 'P' ? 'B' : 'G');
+            drawSolid('threeStarSvg', item.row, item.col, color, null, 30, 30, {});
+        });
+
+        const ask = engine.calculateAskRoad(rawHistory);
+        let askB = ask.askBanker, askP = ask.askPlayer;
+        ['bigEye', 'smallRoad', 'cockroach'].forEach(k => {
+            if (askB[k] === null || askP[k] === null) { askB[k] = null; askP[k] = null; return; }
+            if (askB[k] === askP[k]) { askB[k] = 'RED'; askP[k] = 'BLUE'; }
+        });
+        drawAskIcon('askBigEyeB', 'hollow', askB.bigEye, 44);
+        drawAskIcon('askSmallB', 'solid', askB.smallRoad, 44);
+        drawAskIcon('askCockB', 'slash', askB.cockroach, 44);
+        drawAskIcon('askBigEyeP', 'hollow', askP.bigEye, 44);
+        drawAskIcon('askSmallP', 'solid', askP.smallRoad, 44);
+        drawAskIcon('askCockP', 'slash', askP.cockroach, 44);
+
+        document.getElementById('dragonScore').textContent = stats.dragon;
+        document.getElementById('tigerScore').textContent = stats.tiger;
+        document.getElementById('statDragon').textContent = stats.dragon;
+        document.getElementById('statTiger').textContent = stats.tiger;
+        document.getElementById('statTie').textContent = stats.tie;
+        document.getElementById('statPair').textContent = stats.pair || 0;
+        saveState();
+    }
+
+    function drawAskIcon(svgId, type, color, size) {
+        const svg = document.getElementById(svgId);
+        if (!svg) return;
+        svg.innerHTML = '';
+        if (!color) return;
+        const cx = size / 2, cy = size / 2, r = size * 0.35;
+        const c = color === 'RED' ? '#d32f2f' : '#1976d2';
+        if (type === 'hollow') {
+            const circle = document.createElementNS(SVG_NS, 'circle');
+            circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+            circle.setAttribute('r', r); circle.setAttribute('fill', 'none');
+            circle.setAttribute('stroke', c); circle.setAttribute('stroke-width', '4');
+            svg.appendChild(circle);
+        } else if (type === 'solid') {
+            const circle = document.createElementNS(SVG_NS, 'circle');
+            circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+            circle.setAttribute('r', r); circle.setAttribute('fill', c);
+            svg.appendChild(circle);
+        } else if (type === 'slash') {
+            const s = r * 0.9;
+            const line = document.createElementNS(SVG_NS, 'line');
+            line.setAttribute('x1', cx - s); line.setAttribute('y1', cy + s);
+            line.setAttribute('x2', cx + s); line.setAttribute('y2', cy - s);
+            line.setAttribute('stroke', c); line.setAttribute('stroke-width', '5');
+            line.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(line);
+        }
+    }
+
+    function confirmPending() {
+        if (!pending) { return; }
+        historyStack.push(JSON.stringify({ beadPlateData, stats }));
+        if (historyStack.length > 100) historyStack.shift();
+
+        const isPurePair = pending.type === 'PAIR';
+        const hasPair = isPurePair || pending.pair === 'PAIR';
+        let roadType = pending.type;
+        let displayText = pending.text;
+        if (isPurePair) { roadType = 'T'; displayText = '对'; }
+        beadPlateData.push({
+            type: roadType, text: displayText,
+            pair: hasPair ? 'PAIR' : null, pair2: null,
+            lucky6: false, tie: roadType === 'T', isPair: hasPair
+        });
+        if (roadType === 'B' || roadType === 'D') stats.dragon++;
+        else if (roadType === 'P') stats.tiger++;
+        else stats.tie++;
+        if (hasPair) stats.pair = (stats.pair || 0) + 1;
+
+        renderAll();
+        let msg = getLabel(pending.type);
+        if (hasPair && !isPurePair) msg += '+对子';
+        if (isPurePair) msg = '对子';
+        flash(msg);
+        pending = null; keySeq = [];
+    }
+
+    function getLabel(t) {
+        const m = { 'B':'龙', 'D':'龙', 'P':'虎', 'T':'和', 'PAIR':'对子' };
+        return m[t] || t;
+    }
+    function flash(msg) {
+        const el = document.getElementById('flashMsg');
+        el.textContent = msg; el.classList.add('show');
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => el.classList.remove('show'), 800);
+    }
+    function setStatus(msg) { document.getElementById('statusBar').textContent = msg; }
+    function undo() {
+        if (historyStack.length === 0) { return; }
+        const s = JSON.parse(historyStack.pop());
+        beadPlateData = s.beadPlateData; stats = s.stats; pending = null;
+        renderAll(); flash('↩ 已撤回');
+    }
+
+    // ================== 退出到桌面 ==================
+    function exitToDesktop() {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            (document.exitFullscreen || document.webkitExitFullscreen ||
+             document.msExitFullscreen).call(document);
+        }
+        setTimeout(() => {
+            try {
+                window.close();
+                setTimeout(() => flash('⚠ 请手动关闭 (Ctrl+W / Alt+F4)'), 200);
+            } catch (e) {
+                flash('⚠ 请手动关闭 (Ctrl+W / Alt+F4)');
+            }
+        }, 150);
+    }
+
+    // ================== 键盘 ==================
+    document.addEventListener('keydown', function(e) {
+        const key = e.key;
+        const code = e.code;
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            if (key === 'Escape') closeSettings();
+            return;
+        }
+        if (key === 'Escape') { closeSettings(); return; }
+        if (key === 'f' || key === 'F') { e.preventDefault(); toggleFullscreen(); return; }
+        if (key === 's' || key === 'S') { e.preventDefault(); openSettings(); return; }
+        if (key === '/' || key === '?' || code === 'Slash' || code === 'NumpadDivide') {
+            e.preventDefault(); openSettings(); return;
+        }
+        if (key === 'Enter' || key === 'NumpadEnter' || code === 'NumpadEnter') {
+            e.preventDefault(); flushKeySeq(); confirmPending(); return;
+        }
+        if (key === '-' || key === 'Subtract' || code === 'NumpadSubtract') {
+            e.preventDefault();
+            keySeq = []; if (keySeqTimer) { clearTimeout(keySeqTimer); keySeqTimer = null; }
+            undo(); return;
+        }
+        if (key === '0' || code === 'Numpad0') {
+            e.preventDefault();
+            keySeq = []; if (keySeqTimer) { clearTimeout(keySeqTimer); keySeqTimer = null; }
+            clearAll(); return;
+        }
+        if (key === '*' || code === 'NumpadMultiply' || (e.shiftKey && key === '8')) {
+            e.preventDefault();
+            keySeq = []; if (keySeqTimer) { clearTimeout(keySeqTimer); keySeqTimer = null; }
+            exitToDesktop(); return;
+        }
+        let digit = null;
+        if (key === '1' || code === 'Numpad1') digit = '1';
+        else if (key === '2' || code === 'Numpad2') digit = '2';
+        else if (key === '3' || code === 'Numpad3') digit = '3';
+        else if (key === '4' || code === 'Numpad4') digit = '4';
+        else if (key === '5' || code === 'Numpad5') digit = '5';
+        else if (key === '6' || code === 'Numpad6') digit = '6';
+        else if (key === '7' || code === 'Numpad7') digit = '7';
+        else if (key === '8' || code === 'Numpad8') digit = '8';
+        else if (key === '9' || code === 'Numpad9') digit = '9';
+        if (digit !== null) {
+            e.preventDefault();
+            keySeq.push(digit);
+            if (keySeqTimer) clearTimeout(keySeqTimer);
+            keySeqTimer = setTimeout(() => { flushKeySeq(); }, 2000);
+            interpretKeySeq();
+            return;
+        }
+    });
+
+    function interpretKeySeq() {
+        const s = keySeq.join('');
+        if (s === '1') { pending = { type: 'B', text: '龙', pair: null, pair2: null }; return; }
+        if (s === '2') { pending = { type: 'P', text: '虎', pair: null, pair2: null }; return; }
+        if (s === '3') { pending = { type: 'T', text: '和', pair: null, pair2: null }; return; }
+        if (s === '4') { pending = { type: 'PAIR', text: '对', pair: 'PAIR', pair2: null }; return; }
+        if (s === '14') { pending = { type: 'B', text: '龙', pair: 'PAIR', pair2: null }; return; }
+        if (s === '24') { pending = { type: 'P', text: '虎', pair: 'PAIR', pair2: null }; return; }
+    }
+    function flushKeySeq() {
+        if (keySeq.length === 0) return;
+        interpretKeySeq();
+        keySeq = [];
+        if (keySeqTimer) { clearTimeout(keySeqTimer); keySeqTimer = null; }
+    }
+
+    // ================== 全屏 / 缩放 ==================
+    function toggleFullscreen() {
+        const el = document.documentElement;
+        if (!document.fullscreenElement) {
+            (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen).call(el);
+        } else {
+            (document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen).call(document);
+        }
+    }
+    document.addEventListener('fullscreenchange', () => { setTimeout(resizeScreen, 100); });
+    document.addEventListener('webkitfullscreenchange', () => { setTimeout(resizeScreen, 100); });
+
+    function resizeScreen() {
+        const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+        document.getElementById('screen').style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', resizeScreen);
+
+    function tickClock() {
+        // 手动模式：不自动更新
+        if (settings.timeMode === 'manual') {
+            updateManualDateTime();
+            return;
+        }
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        let displayDate, displayTime;
+        if (settings.timeZone === 'local') {
+            displayDate = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+            displayTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        } else {
+            const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+            const tzOffset = parseFloat(settings.timeZone || '7');
+            const local = new Date(utc + tzOffset * 3600 * 1000);
+            displayDate = `${local.getFullYear()}-${pad(local.getMonth()+1)}-${pad(local.getDate())}`;
+            displayTime = `${pad(local.getHours())}:${pad(local.getMinutes())}`;
+        }
+        document.getElementById('dateVal').textContent = displayDate;
+        document.getElementById('timeVal').textContent = displayTime;
+    }
+
+    document.getElementById('openSettingsBtn').addEventListener('click', openSettings);
+    document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+    document.getElementById('btnSave').addEventListener('click', saveSettingsFromForm);
+    document.getElementById('btnCancel').addEventListener('click', closeSettings);
+    document.getElementById('btnReset').addEventListener('click', resetSettings);
+    document.getElementById('settingsMask').addEventListener('click', function(e) {
+        if (e.target === this) closeSettings();
+    });
+    document.getElementById('setTimeMode').addEventListener('change', toggleManualDateInputs);
+
+
+    // ================== 软授权：每机一码，无有效期 ==================
+    const LICENSE_SECRET = "ROADMAP_SOFT_2026_Qk8mX2";
+    const LICENSE_STORAGE_KEY = "roadmap_license_v1";
+
+    function normalizeMachine(s) {
+        return (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    }
+    async function sha256Hex(text) {
+        const data = new TextEncoder().encode(text);
+        const buf = await crypto.subtle.digest("SHA-256", data);
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+    async function makeAuthCode(machineCode) {
+        const hash = await sha256Hex(machineCode + "|" + LICENSE_SECRET + "|ROAD");
+        const raw = hash.substring(0, 12).toUpperCase();
+        return raw.slice(0,4) + "-" + raw.slice(4,8) + "-" + raw.slice(8,12);
+    }
+    function getOrCreateMachineCode() {
+        try {
+            let m = localStorage.getItem("roadmap_machine_code");
+            if (m && m.length === 8) return m;
+        } catch (e) {}
+        const raw = [
+            navigator.userAgent,
+            screen.width + "x" + screen.height,
+            String(screen.colorDepth),
+            (Intl.DateTimeFormat().resolvedOptions().timeZone || ""),
+            navigator.language
+        ].join("|");
+        let h = 0;
+        for (let i = 0; i < raw.length; i++) h = ((h << 5) - h) + raw.charCodeAt(i) | 0;
+        const hex = Math.abs(h).toString(16).toUpperCase().padStart(8, "0").slice(0, 8);
+        let final = hex;
+        try {
+            let salt = localStorage.getItem("roadmap_machine_salt");
+            if (!salt) {
+                salt = Math.random().toString(16).slice(2, 6).toUpperCase();
+                localStorage.setItem("roadmap_machine_salt", salt);
+            }
+            final = (hex.slice(0, 4) + salt).slice(0, 8);
+            localStorage.setItem("roadmap_machine_code", final);
+        } catch (e) {}
+        return final;
+    }
+    async function isLicenseValid() {
+        try {
+            const saved = localStorage.getItem(LICENSE_STORAGE_KEY);
+            if (!saved) return false;
+            const obj = JSON.parse(saved);
+            const m = getOrCreateMachineCode();
+            if (obj.machine !== m) return false;
+            const expect = await makeAuthCode(m);
+            return obj.code === expect;
+        } catch (e) { return false; }
+    }
+    async function saveLicense(code) {
+        const m = getOrCreateMachineCode();
+        localStorage.setItem(LICENSE_STORAGE_KEY, JSON.stringify({ machine: m, code: code }));
+    }
+    function showLicenseGate() {
+        if (document.getElementById("licenseGate")) return;
+        const m = getOrCreateMachineCode();
+        const gate = document.createElement("div");
+        gate.id = "licenseGate";
+        gate.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;";
+        gate.innerHTML = `
+          <div style="width:440px;background:#2b1a15;border:3px solid #d4af37;border-radius:10px;padding:28px 30px;color:#eee;font-family:Microsoft YaHei,sans-serif;">
+            <div style="text-align:center;font-size:22px;color:#ffeb3b;font-weight:bold;margin-bottom:6px;">软件授权</div>
+            <div style="text-align:center;color:#aaa;font-size:13px;margin-bottom:18px;">每台电脑需独立授权码 · 无有效期限制</div>
+            <div style="margin-bottom:12px;">
+              <div style="color:#ccc;font-size:13px;margin-bottom:4px;">本机机器码（发给授权方）</div>
+              <div style="background:#1a120f;border:1px solid #d4af37;border-radius:4px;padding:12px;text-align:center;font-size:24px;letter-spacing:3px;color:#ffeb3b;font-weight:bold;">${m}</div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <div style="color:#ccc;font-size:13px;margin-bottom:4px;">授权码</div>
+              <input id="licInput" type="text" placeholder="XXXX-XXXX-XXXX" style="width:100%;padding:12px;font-size:18px;letter-spacing:2px;border:1px solid #d4af37;border-radius:4px;background:#f5efe6;color:#000;box-sizing:border-box;" />
+            </div>
+            <div id="licErr" style="color:#e53935;text-align:center;font-size:13px;min-height:20px;margin-bottom:8px;"></div>
+            <button id="licBtn" style="width:100%;padding:12px;font-size:16px;font-weight:bold;border:none;border-radius:4px;background:#d4af37;color:#000;cursor:pointer;">解锁使用</button>
+          </div>`;
+        document.body.appendChild(gate);
+        document.getElementById("licBtn").onclick = async function() {
+            const input = document.getElementById("licInput").value.trim().toUpperCase();
+            const expect = await makeAuthCode(m);
+            if (input === expect) {
+                await saveLicense(input);
+                gate.remove();
+            } else {
+                document.getElementById("licErr").textContent = "授权码错误，请检查后重试";
+            }
+        };
+        document.getElementById("licInput").addEventListener("keydown", e => {
+            if (e.key === "Enter") document.getElementById("licBtn").click();
+        });
+    }
+    async function requireLicense() {
+        const ok = await isLicenseValid();
+        if (!ok) showLicenseGate();
+    }
+
+
+    // ================== 启动 ==================
+    loadSettings();
+    applySettings();
+    loadState();
+    requireLicense();
+    renderAll();
+    resizeScreen();
+    tickClock();
+    setInterval(tickClock, 1000);
+    document.body.tabIndex = 0;
+    document.body.focus();
+</script>
+</body>
+</html>
